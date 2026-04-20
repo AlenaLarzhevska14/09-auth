@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { AxiosResponse } from "axios";
 import { api } from "./api";
 import type { Note, NoteTag } from "@/types/note";
 import type { User } from "@/types/user";
@@ -8,23 +9,19 @@ type NotesHttpResponse = {
   totalPages: number;
 };
 
+type SessionResponse = User | { success: boolean } | null | "";
+
 async function getCookieHeader(): Promise<string> {
   const cookieStore = await cookies();
   return cookieStore.toString();
 }
 
-export async function checkSession(): Promise<User | null> {
-  const { data } = await api.get<User | null | "">("/auth/session", {
+export async function checkSession(): Promise<AxiosResponse<SessionResponse>> {
+  return api.get<SessionResponse>("/auth/session", {
     headers: {
       Cookie: await getCookieHeader(),
     },
   });
-
-  if (!data || typeof data !== "object" || !("email" in data)) {
-    return null;
-  }
-
-  return data;
 }
 
 export async function getMe(): Promise<User> {

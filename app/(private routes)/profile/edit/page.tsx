@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import css from "./EditProfilePage.module.css";
 import { getMe, updateMe } from "@/lib/api/clientApi";
+import { useAuthStore } from "@/lib/store/authStore";
 
 export default function EditProfilePage() {
   const router = useRouter();
+  const setUser = useAuthStore((state) => state.setUser);
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -20,6 +22,7 @@ export default function EditProfilePage() {
     async function fetchUser() {
       try {
         const user = await getMe();
+        setUser(user);
         setUsername(user.username);
         setEmail(user.email);
         setAvatar(
@@ -34,13 +37,14 @@ export default function EditProfilePage() {
     }
 
     fetchUser();
-  }, []);
+  }, [setUser]);
 
   async function handleSubmit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
-      await updateMe({ username });
+      const updatedUser = await updateMe({ username });
+      setUser(updatedUser);
       router.push("/profile");
     } catch (error) {
       console.error("Failed to update profile", error);

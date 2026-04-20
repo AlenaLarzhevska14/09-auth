@@ -7,6 +7,12 @@ type NotesHttpResponse = {
   totalPages: number;
 };
 
+type SessionResponse = User | { success: boolean } | null | "";
+
+function isUser(data: SessionResponse): data is User {
+  return Boolean(data && typeof data === "object" && "email" in data);
+}
+
 export async function fetchNotes(
   searchQuery: string,
   page: number,
@@ -63,13 +69,17 @@ export async function logout(): Promise<void> {
 }
 
 export async function checkSession(): Promise<User | null> {
-  const { data } = await api.get<User | null | "">("/auth/session");
+  const { data } = await api.get<SessionResponse>("/auth/session");
 
-  if (!data || typeof data !== "object" || !("email" in data)) {
-    return null;
+  if (isUser(data)) {
+    return data;
   }
 
-  return data;
+  if (data && typeof data === "object" && "success" in data && data.success) {
+    return getMe();
+  }
+
+  return null;
 }
 
 export async function getMe(): Promise<User> {

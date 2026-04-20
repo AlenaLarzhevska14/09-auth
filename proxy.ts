@@ -1,25 +1,47 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { checkSession } from "./lib/api/serverApi";
 
-export function proxy(request: NextRequest) {
+const privateRoutes = ["/profile", "/notes"];
+const authRoutes = ["/sign-in", "/sign-up"];
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPrivateRoute =
-    pathname.startsWith("/profile") || pathname.startsWith("/notes");
+  const isPrivateRoute = privateRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
 
-  const isAuthRoute =
-    pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
-  const accessToken = request.cookies.get("accessToken")?.value;
-  const refreshToken = request.cookies.get("refreshToken")?.value;
-  const isAuthenticated = Boolean(accessToken || refreshToken);
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("accessToken")?.value;
+  const refreshToken = cookieStore.get("refreshToken")?.value;
+
+  let isAuthenticated = Boolean(accessToken);
+
+  if (!accessToken && refreshToken) {
+    try {
+      const session = await checkSession();
+      const data = session.data;
+
+      isAuthenticated = Boolean(
+        data &&
+          typeof data === "object" &&
+          (("success" in data && data.success) || "email" in data)
+      );
+    } catch {
+      isAuthenticated = false;
+    }
+  }
 
   if (!isAuthenticated && isPrivateRoute) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }
 
   if (isAuthenticated && isAuthRoute) {
-    return NextResponse.redirect(new URL("/profile", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
