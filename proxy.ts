@@ -6,6 +6,23 @@ import { checkSession } from "./lib/api/serverApi";
 const privateRoutes = ["/profile", "/notes"];
 const authRoutes = ["/sign-in", "/sign-up"];
 
+function applySetCookie(
+  response: NextResponse,
+  setCookie: string | string[] | undefined
+) {
+  if (!setCookie) {
+    return response;
+  }
+
+  const cookieHeaders = Array.isArray(setCookie) ? setCookie : [setCookie];
+
+  for (const cookieHeader of cookieHeaders) {
+    response.headers.append("set-cookie", cookieHeader);
+  }
+
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -20,11 +37,19 @@ export async function proxy(request: NextRequest) {
   const refreshToken = cookieStore.get("refreshToken")?.value;
 
   let isAuthenticated = Boolean(accessToken);
+  let setCookie: string | string[] | undefined;
 
   if (!accessToken && refreshToken) {
     try {
       const session = await checkSession();
       const data = session.data;
+      const sessionSetCookie = session.headers["set-cookie"];
+
+      setCookie = Array.isArray(sessionSetCookie)
+        ? sessionSetCookie
+        : sessionSetCookie
+        ? String(sessionSetCookie)
+        : undefined;
 
       isAuthenticated = Boolean(
         data &&
@@ -37,14 +62,20 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!isAuthenticated && isPrivateRoute) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+    return applySetCookie(
+      NextResponse.redirect(new URL("/sign-in", request.url)),
+      setCookie
+    );
   }
 
   if (isAuthenticated && isAuthRoute) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return applySetCookie(
+      NextResponse.redirect(new URL("/", request.url)),
+      setCookie
+    );
   }
 
-  return NextResponse.next();
+  return applySetCookie(NextResponse.next(), setCookie);
 }
 
 export const config = {
